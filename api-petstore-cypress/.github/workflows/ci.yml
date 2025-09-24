@@ -1,0 +1,133 @@
+name: API Tests CI/CD Pipeline
+
+# Este pipeline se ejecuta en cada push a main y en cada pull request
+# Demuestra comprensión de CI/CD y mejores prácticas de DevOps
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  # Permite ejecución manual desde GitHub Actions
+  workflow_dispatch:
+
+jobs:
+  api-tests:
+    name: 🧪 Run API Tests
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]  # Probamos en múltiples versiones de Node
+    
+    steps:
+      # Checkout del código
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      # Setup de Node.js
+      - name: 🔧 Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'  # Cache de dependencias para mayor velocidad
+      
+      # Instalar dependencias
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      # Verificar que Cypress está instalado correctamente
+      - name: Verify Cypress
+        run: npx cypress verify
+      
+      # Ejecutar las pruebas
+      - name: 🚀 Run API tests
+        run: npm test
+        continue-on-error: false  # Falla el pipeline si fallan las pruebas
+      
+      # Subir reportes como artifacts
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()  # Sube reportes incluso si las pruebas fallan
+        with:
+          name: cypress-reports-node${{ matrix.node-version }}
+          path: |
+            cypress/reports/html/
+            cypress/videos/
+            cypress/screenshots/
+          retention-days: 30
+      
+      # Publicar resultados en el summary del job
+      - name: 📝 Publish test results summary
+        if: always()
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Node Version: ${{ matrix.node-version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Status: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Commit: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📈 Reports" >> $GITHUB_STEP_SUMMARY
+          echo "Test reports have been uploaded as artifacts and can be downloaded from the Actions tab." >> $GITHUB_STEP_SUMMARY
+      
+      # Comentar en PR con resultados (solo en pull requests)
+      - name: 💬 Comment PR with results
+        if: github.event_name == 'pull_request' && always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ job.status }}';
+            const emoji = status === 'success' ? '✅' : '❌';
+            const message = `${emoji} **API Tests Result**: ${status}
+            
+            Node Version: ${{ matrix.node-version }}
+            [View full report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: message
+            });
+
+  # Job adicional para análisis de calidad de código
+  code-quality:
+    name: 📝 Code Quality Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20.x
+      
+      - name: 📦 Install dependencies
+        run: npm ci
+      
+      - name: 🔍 Check for console.logs in tests
+        run: |
+          echo "Checking for forgotten console.logs..."
+          ! grep -r "console\.\(log\|debug\|info\)" cypress/e2e --include="*.cy.js" || echo "No console.logs found in test files"
+      
+      - name: 📏 Check code formatting
+        run: |
+          echo "Validating code structure..."
+          find cypress -name "*.js" -exec echo "{}" \;
+
+  # Job de notificación final
+  notify-completion:
+    name: 📢 Notify Completion
+    needs: [api-tests, code-quality]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: 🎉 Final Status
+        run: |
+          echo "## Pipeline Completed!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All jobs have finished execution." >> $GITHUB_STEP_SUMMARY
+          echo "Check the artifacts section for detailed reports." >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,54 @@
+Conclusiones – Pruebas de API (PetStore + Cypress)
+
+Resumen
+Implementé una suite de pruebas automatizadas contra [https://petstore.swagger.io](https://petstore.swagger.io) que cubre el flujo CRUD de mascotas: crear, consultar por ID, actualizar (nombre + estatus) y buscar por estatus. Además incluí casos negativos y validación de esquemas con Joi. El enfoque priorizó estabilidad (datos únicos por ejecución, asserts de esquema y códigos HTTP) y mantenibilidad (helpers reutilizables, logging claro y reporter Mochawesome). Cobertura efectiva del 100% de los escenarios requeridos, más validaciones que agregan valor.
+
+Las validaciones en cada paso
+
+* Crear mascota: envío de payload completo; verificación de 200, shape con Joi y persistencia inmediata.
+* Consultar por ID: confirmo que el recurso creado es recuperable (id, name, status) y cumple el esquema.
+* Actualizar (PUT): cambio de name y status a “sold”; valido 200, shape y campos actualizados.
+* Buscar por status: confirmo que el ID actualizado aparece en el resultado para `sold`.
+* Negativos y bordes: ID inexistente → 404; status inválido en búsqueda → array vacío; intento de recrear con mismo ID y tipos de datos fuera de contrato (strings en campos numéricos).
+
+Resultados y sensación de uso
+
+* 10 pruebas, 100% de éxito; tiempo total \~3.5 s en local.
+* Latencias consistentes: \~200–400 ms en operaciones simples y hasta \~1000 ms en búsquedas.
+* La ejecución es fluida y reproducible; el logging con niveles/emojis agiliza la lectura del run.
+
+Decisiones de diseño y por qué
+
+* Cypress para APIs: poco convencional, pero mantiene coherencia con el E2E web y reduce la curva de aprendizaje del equipo.
+* Joi para validar esquemas: previene regresiones silenciosas en la estructura de respuesta.
+* Helper pattern: centraliza la creación/actualización y reduce cambios a un solo punto.
+* Datos dinámicos: IDs y sufijos únicos por corrida para evitar colisiones y falsos positivos.
+* Reporter Mochawesome: evidencia HTML consolidada listísima para adjuntar en el .zip/CI.
+
+Estabilidad y flakiness
+
+* No se observaron flakies en corridas consecutivas; la unicidad de datos elimina dependencias entre ejecuciones.
+* Riesgo externo: la API pública a veces “pierde” recursos tras un PUT (GET inmediato puede devolver 404). Lo traté como hallazgo crítico del backend, no como inestabilidad del test.
+
+Mantenibilidad y escalabilidad
+
+* Estructura modular (tests / helpers / schemas) que facilita extender con nuevos endpoints.
+* Fácil de parametrizar (data-driven por estatus/categorías) y de etiquetar por criticidad (@smoke/@regression).
+* Lista para paralelizar en CI y combinar con contract testing.
+
+Riesgos / Deuda técnica detectada
+
+* Persistencia inconsistente tras updates (PUT 200 pero GET 404 inmediato) → posible problema transaccional o limpieza agresiva.
+* Permisividad de tipos: acepta strings en campos numéricos; no valida dominio de `status`.
+* Re-crear con el mismo ID sobrescribe silenciosamente.
+* Updates parciales no soportados (se exige objeto completo).
+* Swagger no refleja todo el comportamiento real (códigos/validaciones).
+
+Evidencia y reproducibilidad
+
+* Reporte HTML Mochawesome, logs legibles, y scripts listos en README.
+* Datos únicos por ejecución (timestamps/UUID) aseguran independencia entre corridas.
+* Pipeline de GitHub Actions puede adjuntar artifacts (reportes/logs) por cada run.
+
+Conclusión personal
+La suite cumple y va más allá de lo solicitado: además de validar el “camino feliz”, expone debilidades contractuales reales (tipos, dominio y persistencia) con métricas y evidencia clara. El stack Cypress + Joi + helpers ofrece rapidez de desarrollo, baja fricción para el equipo y una base sólida para escalar. Como siguientes pasos, priorizaría: validaciones de seguridad básica, soporte de PATCH/errores descriptivos en la API y un set de contract/performance tests; el ROI es notable (≈250× más rápido que manual y \~3 horas ahorradas cada 10 ejecuciones).

@@ -1,0 +1,45 @@
+{
+  "validPet": {
+    "id": 99887766,
+    "category": {
+      "id": 1,
+      "name": "Dogs"
+    },
+    "name": "Bobby",
+    "photoUrls": [
+      "https://example.com/photos/bobby1.jpg",
+      "https://example.com/photos/bobby2.jpg"
+    ],
+    "tags": [
+      {
+        "id": 1,
+        "name": "friendly"
+      },
+      {
+        "id": 2,
+        "name": "trained"
+      }
+    ],
+    "status": "available"
+  },
+  "updatedPetData": {
+    "name": "Bobby Updated",
+    "status": "sold"
+  },
+  "invalidPet": {
+    "id": "invalid_id",
+    "name": 123,
+    "status": "invalid_status"
+  },
+  "petWithMinimalData": {
+    "id": 88776655,
+    "name": "Minimal Pet",
+    "photoUrls": [],
+    "status": "pending"
+  },
+  "statusFilters": {
+    "available": "available",
+    "pending": "pending",
+    "sold": "sold"
+  }
+}
